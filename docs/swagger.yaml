@@ -1,0 +1,47 @@
+basePath: /
+definitions:
+  contracts.CategoriesResponse:
+    properties:
+      categories:
+        items:
+          $ref: '#/definitions/contracts.CategoryResponse'
+        type: array
+    type: object
+  contracts.CategoryResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  contracts.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: API for managing events.
+  title: Evently API
+  version: "1.0"
+paths:
+  /events/categories:
+    get:
+      description: Returns all available event categories
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/contracts.CategoriesResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/contracts.ErrorResponse'
+      summary: List event categories
+      tags:
+      - events
+swagger: "2.0"
