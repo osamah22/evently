@@ -1,0 +1,11 @@
+# Copy this file to terraform.tfvars and fill in the non-secret values.
+# terraform.tfvars is gitignored — never commit real values.
+#
+# Do NOT put auth0_client_id / auth0_client_secret here. Provide those
+# via environment variables instead, e.g.:
+#   export TF_VAR_auth0_client_id="..."
+#   export TF_VAR_auth0_client_secret="..."
+
+auth0_domain               = "your-tenant.us.auth0.com"
+resource_server_identifier = "https://api.evently.example.com"
+superuser_user_id          = "auth0|xxxxxxxxxxxxxxxxxxxxxxxx"

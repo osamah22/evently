@@ -2,54 +2,116 @@ package main
 
 import (
 	"context"
-	"flag"
-	"fmt"
-	"log"
-	"net/http"
-	"os"
+	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
-	"github.com/osamah22/evently/datab"
-	"github.com/osamah22/evently/database"
-	_ "github.com/osamah22/evently/docs"
-	"github.com/osamah22/evently/handlers"
-	swaggerfiles "github.com/swaggo/files"
-	ginswagger "github.com/swaggo/gin-swagger"
+	"github.com/go-playground/validator/v10"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/osamah22/evently/config"
+	"github.com/osamah22/evently/internal/auth"
+	"github.com/osamah22/evently/internal/category"
+	"github.com/osamah22/evently/internal/models"
+	"github.com/osamah22/evently/internal/user"
+	apperr "github.com/osamah22/evently/pkg/apperror"
+	applog "github.com/osamah22/evently/pkg/logger"
+	"github.com/osamah22/evently/pkg/shutdown"
 	"go.uber.org/zap"
 )
 
-// @title						Evently API
-// @version					1.0
-// @description				API for managing events.
-// @BasePath					/
+// @title			Evently API
+// @version		1.0
+// @description	API for managing events.
+// @BasePath		/
+//
+// @securityDefinitions.apikey	BearerAuth
+// @in							header
+// @name						Authorization
+// @description				Type "Bearer" followed by a space and the JWT.
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Println("no .env file found, relying on real env vars")
-	}
-	port := flag.String("port", ":8080", "specify which port to run the server")
-	logger, err := zap.NewProduction()
+	// load config
+	env, err := config.LoadConfig()
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
-	defer logger.Sync()
 
-	pool, err := database.NewPool(context.Background(), os.Getenv("DB_URL"))
+	cleanup, err := run(env)
+
+	defer cleanup()
+
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
-	defer pool.Close()
 
-	router := gin.New()
-	router.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "pong"})
+	// ensure the server is shutdown gracefully & app runs
+	shutdown.Gracefully()
+}
+
+func run(env config.EnvVars) (func(), error) {
+	zapLogger, err := applog.New()
+	if err != nil {
+		return func() {}, err
+	}
+
+	pool, err := pgxpool.New(context.Background(), env.DB_URL)
+	if err != nil {
+		return func() { _ = zapLogger.Sync() }, err
+	}
+
+	app := buildServer(env, zapLogger, pool)
+
+	// start the server
+	go func() {
+		if err := app.Listen(":" + env.PORT); err != nil {
+			zapLogger.Error("server stopped listening", zap.Error(err))
+		}
+	}()
+
+	// return a function to close the server, database and logger, in that order
+	return func() {
+		_ = app.Shutdown()
+		pool.Close()
+		_ = zapLogger.Sync()
+	}, nil
+}
+
+func buildServer(env config.EnvVars, zapLogger *zap.Logger, pool *pgxpool.Pool) *fiber.App {
+	// create the fiber app
+	app := fiber.New(fiber.Config{
+		ErrorHandler: func(c fiber.Ctx, err error) error {
+			return apperr.Respond(c, err)
+		},
+		StructValidator: &structValidator{validate: validator.New()},
+		ReadTimeout:     time.Second * 10,
+		WriteTimeout:    time.Second * 30,
 	})
-	router.GET("/swagger/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
 
-	q := datab.New(pool)
-	eventController := handlers.NewEventController(logger, q)
-	eventController.RegisterRoutes(router)
+	// add middleware
+	app.Use(cors.New())
+	app.Use(applog.Middleware(zapLogger))
 
-	fmt.Printf("starting server under port %s\n", *port)
-	log.Fatal(http.ListenAndServe(*port, router))
+	// add swagger docs
+	registerSwagger(app)
+
+	// add health check
+	app.Get("/health", func(c fiber.Ctx) error {
+		db := "Healthy!"
+		if err := pool.Ping(c.Context()); err != nil {
+			db = "Not Healthy!"
+		}
+		return c.JSON(fiber.Map{"server": "Healthy!", "database": db})
+	})
+
+	// creating the user service
+	userService := user.NewService(models.New(pool))
+	authmw := auth.NewAuthMiddleware(env, zapLogger, userService)
+	// create the user group
+	userController := user.NewUserController(userService)
+	user.CreateUserGroup(app, userController, authmw)
+	// create the category group
+	categoryService := category.NewService(models.New(pool))
+	categoryController := category.NewController(categoryService)
+	category.NewCategoryGroup(app, categoryController, authmw)
+
+	return app
 }

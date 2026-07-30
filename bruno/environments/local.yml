@@ -1,0 +1,14 @@
+name: local
+variables:
+  - name: baseUrl
+    value: http://localhost:8080
+    description: ""
+  - name: clienId
+    value: JdQXQPX773aPH1j0cv9VQiHcN3Q0khC9
+    description: ""
+  - name: authUrl
+    value: https://dev-22j84qce0y3ldziy.us.auth0.com
+    description: ""
+  - secret: true
+    name: clientSecret
+    description: ""

@@ -1,12 +1,28 @@
 version: "2"
 sql:
   - engine: "postgresql"
-    queries: "./datab/queries"
-    schema: "./migrations"
+    queries: "./database/queries"
+    schema: "./database/migrations"
     gen:
       go:
-        package: "datab"
-        out: "./datab"
+        package: "models"
+        out: "./internal/models"
         sql_package: "pgx/v5"
         emit_json_tags: true
         emit_interface: true
+
+        overrides:
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/google/uuid"
+              package: "uuid"
+              type: "UUID"
+
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+
+          - db_type: "timestamp"
+            go_type: "time.Time"
+
+          - db_type: "date"
+            go_type: "time.Time"

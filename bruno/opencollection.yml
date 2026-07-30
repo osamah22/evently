@@ -1,0 +1,49 @@
+opencollection: 1.0.0
+
+info:
+  name: evently
+config:
+  proxy:
+    inherit: true
+    config:
+      protocol: http
+      hostname: ""
+      port: ""
+      auth:
+        username: ""
+        password: ""
+      bypassProxy: ""
+
+request:
+  auth:
+    type: oauth2
+    flow: authorization_code
+    authorizationUrl: "{{authUrl}}/authorize"
+    accessTokenUrl: "{{authUrl}}/oauth/token"
+    refreshTokenUrl: "{{authUrl}}/oauth/token"
+    callbackUrl: http://localhost:3000/oauth/callback
+    credentials:
+      clientId: "{{clienId}}"
+      clientSecret: "{{clientSecret}}"
+      placement: basic_auth_header
+    additionalParameters:
+      authorizationRequest:
+        - name: audience
+          placement: query
+          value: evently.it.com
+    scope: openid profile email offline_access
+    pkce: {}
+    tokenConfig:
+      id: credentials
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: true
+      autoRefreshToken: false
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

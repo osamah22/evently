@@ -3,7 +3,7 @@
 //   sqlc v1.29.0
 // source: categories.sql
 
-package datab
+package models
 
 import (
 	"context"
@@ -64,4 +64,15 @@ func (q *Queries) ListCategories(ctx context.Context) ([]Category, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const categoryExistsById = `-- name: categoryExistsById :one
+select exists(select id, name, created_at from categories where id = $1)
+`
+
+func (q *Queries) categoryExistsById(ctx context.Context, id int32) (bool, error) {
+	row := q.db.QueryRow(ctx, categoryExistsById, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }

@@ -1,5 +1,42 @@
 basePath: /
 definitions:
+  apperr.AppError:
+    properties:
+      code:
+        $ref: '#/definitions/apperr.Code'
+      err:
+        description: wrapped original error, for logging
+      internal:
+        description: true = don't leak details, log server-side only
+        type: boolean
+      message:
+        description: safe to show to the client
+        type: string
+      status:
+        type: integer
+    type: object
+  apperr.Code:
+    enum:
+    - not_found
+    - validation_error
+    - forbidden
+    - conflict
+    - internal_error
+    type: string
+    x-enum-varnames:
+    - CodeNotFound
+    - CodeValidation
+    - CodeForbidden
+    - CodeConflict
+    - CodeInternal
+  category.createRequest:
+    properties:
+      name:
+        maxLength: 255
+        type: string
+    required:
+    - name
+    type: object
   contracts.CategoriesResponse:
     properties:
       categories:
@@ -9,6 +46,13 @@ definitions:
     type: object
   contracts.CategoryResponse:
     properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  models.Category:
+    properties:
       created_at:
         type: string
       id:
@@ -16,9 +60,13 @@ definitions:
       name:
         type: string
     type: object
-  contracts.ErrorResponse:
+  models.User:
     properties:
-      error:
+      auth0_id:
+        type: string
+      created_at:
+        type: string
+      id:
         type: string
     type: object
 info:
@@ -27,9 +75,9 @@ info:
   title: Evently API
   version: "1.0"
 paths:
-  /events/categories:
+  /categories:
     get:
-      description: Returns all available event categories
+      description: List all event categories
       produces:
       - application/json
       responses:
@@ -40,8 +88,103 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/contracts.ErrorResponse'
-      summary: List event categories
+            $ref: '#/definitions/apperr.AppError'
+      summary: List categories
       tags:
-      - events
+      - categories
+    post:
+      consumes:
+      - application/json
+      description: Create a new event category
+      parameters:
+      - description: Category to create
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/category.createRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Category'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apperr.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/apperr.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apperr.AppError'
+      security:
+      - BearerAuth: []
+      summary: Create category
+      tags:
+      - categories
+  /categories/{id}:
+    delete:
+      description: Delete an event category by id
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apperr.AppError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/apperr.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apperr.AppError'
+      security:
+      - BearerAuth: []
+      summary: Delete category
+      tags:
+      - categories
+  /user/me:
+    get:
+      description: Return the profile of the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apperr.AppError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apperr.AppError'
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - user
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and the JWT.
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
