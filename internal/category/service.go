@@ -8,18 +8,24 @@ import (
 	apperr "github.com/osamah22/evently/pkg/apperror"
 )
 
-type Service struct {
-	q *models.Queries
+type repository interface {
+	ListCategories(ctx context.Context) ([]models.Category, error)
+	CreateCategory(ctx context.Context, name string) (models.Category, error)
+	DeleteById(ctx context.Context, id int32) (models.Category, error)
 }
 
-func NewService(queries *models.Queries) *Service {
+type Service struct {
+	repo repository
+}
+
+func NewService(repo repository) *Service {
 	return &Service{
-		q: queries,
+		repo: repo,
 	}
 }
 
 func (s *Service) List(ctx context.Context) ([]models.Category, error) {
-	categories, err := s.q.ListCategories(ctx)
+	categories, err := s.repo.ListCategories(ctx)
 	if err != nil {
 		return nil, apperr.FromPgError(err, "category")
 	}
@@ -27,7 +33,7 @@ func (s *Service) List(ctx context.Context) ([]models.Category, error) {
 }
 
 func (s *Service) Create(ctx context.Context, name string) (models.Category, error) {
-	category, err := s.q.CreateCategory(ctx,
+	category, err := s.repo.CreateCategory(ctx,
 		strings.TrimSpace(strings.ToUpper(name)))
 	if err != nil {
 		return models.Category{}, apperr.FromPgError(err, "category")
@@ -36,7 +42,7 @@ func (s *Service) Create(ctx context.Context, name string) (models.Category, err
 }
 
 func (s *Service) Delete(ctx context.Context, id int) (models.Category, error) {
-	category, err := s.q.DeleteById(ctx, int32(id))
+	category, err := s.repo.DeleteById(ctx, int32(id))
 	if err != nil {
 		return models.Category{}, apperr.FromPgError(err, "category")
 	}
